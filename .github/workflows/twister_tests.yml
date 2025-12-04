@@ -32,7 +32,7 @@ permissions:
 jobs:
   twister-tests:
     name: Twister Unit Tests
-    runs-on: ${{ matrix.os }}
+    runs-on: self-hosted
     strategy:
       matrix:
         python-version: ['3.10', '3.11', '3.12', '3.13']
