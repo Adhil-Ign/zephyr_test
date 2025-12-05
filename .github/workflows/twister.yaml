@@ -381,6 +381,7 @@ jobs:
             cat errors.md  >> $GITHUB_STEP_SUMMARY
           fi
 
+          
       - name: Upload Twister Analysis Results
         if: needs.twister-build.result == 'failure'
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
