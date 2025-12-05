@@ -1,0 +1,81 @@
+# Runs Zephyr Twister tests on a single, locally attached board via a self-hosted runner.
+# Replace the TODO placeholders with your board-specific settings.
+
+name: Twister Hardware Board
+
+on:
+  push:
+    branches:
+      - main
+      # TODO: add/remove branches as needed
+
+permissions:
+  contents: read
+
+jobs:
+  twister-hw:
+    runs-on: self-hosted
+    env:
+      # TODO: Point this to your SDK/toolchain if different.
+      ZEPHYR_TOOLCHAIN_VARIANT: zephyr
+      # Example SDK location; adjust for your runner.
+      ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-$(cat SDK_VERSION)
+      ZEPHYR_BASE: ${{ github.workspace }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: 3.12
+          cache: pip
+          cache-dependency-path: scripts/requirements-actions.txt
+
+      - name: Install Zephyr Python deps
+        run: |
+          pip install -r scripts/requirements-actions.txt --require-hashes
+
+      - name: Fetch modules (west update)
+        run: |
+          west init -l .
+          west update
+
+      - name: Prepare hardware access
+        run: |
+          echo "Ensure your board is plugged in and accessible at the provided serial port."
+          ls -l ${{ inputs.serial_port }} || true
+          # TODO: Add any udev/permissions/setup needed for your board (e.g. stty reset, usb reset).
+
+      - name: Run Twister on hardware
+        env:
+          BOARD: ${{ vars.TWISTER_BOARD }}
+          SERIAL_PORT: ${{ vars.TWISTER_SERIAL_PORT }}
+          FILTER: ${{ vars.TWISTER_FILTER || '' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BOARD}" ] || [ -z "${SERIAL_PORT}" ]; then
+            echo "BOARD and SERIAL_PORT must be set via repository/org variables (TWISTER_BOARD, TWISTER_SERIAL_PORT)." >&2
+            exit 1
+          fi
+          echo "Running Twister for board=${BOARD} serial=${SERIAL_PORT}"
+          # TODO: Adjust --device-serial/--west-flash/--harness-tty-timeout for your board if needed.
+          ./scripts/twister \
+            --board ${BOARD} \
+            --device-testing \
+            --device-serial ${SERIAL_PORT} \
+            --harness-tty-timeout 120 \
+            --inline-logs \
+            --force-color \
+            ${FILTER}
+
+      - name: Upload Twister artifacts
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: twister-hw-artifacts
+          if-no-files-found: ignore
+          path: |
+            twister-out/**
